@@ -538,10 +538,6 @@
       padding-right: 36px;
     }
 
-    .form-group select option:disabled {
-      color: #8e8e93;
-    }
-
     .form-group input:focus,
     .form-group select:focus,
     .form-group textarea:focus {
@@ -801,7 +797,20 @@
   <footer>Midnight Sessions · Music Booking</footer>
 
   <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzeSP_ZwSIW1h9Xt_MIwmihTp3Z8pen5u_Rch94xmAYmE77B92yGwdM-oKf_JsoKbt8/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwa1eTbY5FwMJVIJB3XzGBI8hKEHshNGBgO-ea6fz8Qc_Xd1O-loOKVsZYvKz6JSLsm/exec';
+
+    const AVAILABLE_DAYS = [0, 2, 4, 6]; // Sun, Tue, Thu, Sat
+
+    const WEEKEND_TIMES = [
+      "11:00 AM", "12:00 PM", "1:00 PM", "2:00 PM",
+      "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM"
+    ];
+    const WEEKDAY_TIMES = [
+      "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
+    ];
+
+    let currentDate = new Date();
+    let selectedDate = null;
 
     let acceptedBookings = {};
     let acceptedBookingsLoaded = false;
@@ -811,12 +820,10 @@
 
       const str = String(value).trim();
 
-      // Already in YYYY-MM-DD form.
       if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
         return str.slice(0, 10);
       }
 
-      // Handle dates such as M/D/YYYY or MM/DD/YYYY.
       const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       if (slashMatch) {
         const month = slashMatch[1].padStart(2, '0');
@@ -868,19 +875,6 @@
         console.error('Could not load accepted bookings:', err);
       }
     }
-
-    const AVAILABLE_DAYS = [0, 2, 4, 6]; // Sun, Tue, Thu, Sat
-
-    const WEEKEND_TIMES = [
-      "11:00 AM", "12:00 PM", "1:00 PM", "2:00 PM",
-      "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM"
-    ];
-    const WEEKDAY_TIMES = [
-      "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"
-    ];
-
-    let currentDate = new Date();
-    let selectedDate = null;
 
     const monthYearEl = document.getElementById('monthYear');
     const daysGrid = document.getElementById('daysGrid');
@@ -957,7 +951,7 @@
 
       const options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
       const displayDate = date.toLocaleDateString('en-US', options);
-      const isoDate = date.toISOString().split('T')[0];
+      const isoDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
       document.getElementById('selectedDateText').textContent = displayDate;
       document.getElementById('hiddenDate').value = isoDate;
