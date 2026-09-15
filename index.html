@@ -985,6 +985,11 @@
       document.getElementById('selectedDateText').textContent = displayDate;
       document.getElementById('hiddenDate').value = isoDate;
 
+      // Reset the form FIRST. Resetting after building the time options would
+      // wipe out the options we just added.
+      document.getElementById('bookingForm').reset();
+      document.getElementById('hiddenDate').value = isoDate;
+
       const times = getTimesForDate(date);
       const dateKey = normalizeDateKey(date);
       const bookedTimes = acceptedBookings[dateKey] || [];
@@ -1013,8 +1018,6 @@
       document.getElementById('formView').style.display = 'block';
       document.getElementById('successState').classList.remove('show');
       document.getElementById('formMessage').textContent = '';
-      document.getElementById('bookingForm').reset();
-      document.getElementById('hiddenDate').value = isoDate;
 
       document.getElementById('modalOverlay').classList.add('active');
       document.body.style.overflow = 'hidden';
