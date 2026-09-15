@@ -873,36 +873,72 @@
       return str;
     }
 
-    async function loadAcceptedBookings() {
-      try {
-        const response = await fetch(SCRIPT_URL, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    // Apps Script ContentService can redirect to a googleusercontent.com URL.
+    // JSONP avoids browser CORS/redirect problems for the GET booking lookup.
+    let bookingRequestNumber = 0;
 
-        const data = await response.json();
+    function loadAcceptedBookings() {
+      const requestId = ++bookingRequestNumber;
+      const callbackName = `midnightBookingsCallback_${Date.now()}_${requestId}`;
 
-        if (data.result === 'success' && Array.isArray(data.bookings)) {
-          acceptedBookings = {};
+      window[callbackName] = function(data) {
+        try {
+          if (data && data.result === 'success' && Array.isArray(data.bookings)) {
+            acceptedBookings = {};
 
-          data.bookings.forEach(booking => {
-            const dateKey = normalizeDateKey(booking.date);
-            const timeKey = normalizeTime(booking.time);
+            data.bookings.forEach(booking => {
+              const dateKey = normalizeDateKey(booking.date);
+              const timeKey = normalizeTime(booking.time);
 
-            if (!dateKey || !timeKey) return;
+              if (!dateKey || !timeKey) return;
 
-            if (!acceptedBookings[dateKey]) acceptedBookings[dateKey] = [];
-            if (!acceptedBookings[dateKey].includes(timeKey)) {
-              acceptedBookings[dateKey].push(timeKey);
+              if (!acceptedBookings[dateKey]) {
+                acceptedBookings[dateKey] = [];
+              }
+
+              if (!acceptedBookings[dateKey].includes(timeKey)) {
+                acceptedBookings[dateKey].push(timeKey);
+              }
+            });
+
+            acceptedBookingsLoaded = true;
+            renderCalendar();
+
+            // If the modal is already open when the booking data arrives,
+            // rebuild its time list immediately.
+            if (selectedDate) {
+              const activeDay = document.querySelector('.day.selected');
+              if (activeDay) selectDate(selectedDate, activeDay);
             }
-          });
-
-          acceptedBookingsLoaded = true;
-          renderCalendar();
-        } else {
-          console.error('Unexpected booking data:', data);
+          } else {
+            console.error('Unexpected booking data:', data);
+          }
+        } finally {
+          cleanup();
         }
-      } catch (err) {
-        console.error('Could not load accepted bookings:', err);
+      };
+
+      const script = document.createElement('script');
+      script.src = `${SCRIPT_URL}?callback=${encodeURIComponent(callbackName)}&_=${Date.now()}`;
+      script.async = true;
+
+      let timeout = setTimeout(() => {
+        console.error('Timed out loading accepted bookings.');
+        cleanup();
+      }, 10000);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        delete window[callbackName];
+        if (script.parentNode) script.parentNode.removeChild(script);
       }
+
+      script.onerror = function() {
+        console.error('Could not load accepted bookings from Apps Script.');
+        cleanup();
+      };
+
+      document.head.appendChild(script);
     }
 
     const monthYearEl = document.getElementById('monthYear');
@@ -983,10 +1019,8 @@
       const isoDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
       document.getElementById('selectedDateText').textContent = displayDate;
-      document.getElementById('hiddenDate').value = isoDate;
 
-      // Reset the form FIRST. Resetting after building the time options would
-      // wipe out the options we just added.
+      // Reset the form BEFORE rebuilding the time options.
       document.getElementById('bookingForm').reset();
       document.getElementById('hiddenDate').value = isoDate;
 
