@@ -602,6 +602,14 @@
       font-size: 28px;
     }
 
+    #timeSelect option.booked-time {
+      color: #888;
+    }
+
+    #timeSelect option:disabled {
+      cursor: not-allowed;
+    }
+
     footer {
       text-align: center;
       padding: 40px 24px;
@@ -840,8 +848,29 @@
     }
 
     function normalizeTime(value) {
-      if (!value) return '';
-      return String(value).trim().toUpperCase().replace(/\s+/g, ' ');
+      if (value === null || value === undefined || value === '') return '';
+
+      let str = String(value).trim().toUpperCase().replace(/\s+/g, ' ');
+
+      // Normalize common Google Sheets / Apps Script time formats.
+      str = str.replace(/^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)$/, '$1:$2 $4');
+      str = str.replace(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/, (_, h, m, ap) => {
+        return `${parseInt(h, 10)}:${m} ${ap}`;
+      });
+
+      // Convert 24-hour times such as 18:00 to 6:00 PM.
+      const twentyFour = str.match(/^(\d{1,2}):(\d{2})$/);
+      if (twentyFour) {
+        let hours = parseInt(twentyFour[1], 10);
+        const minutes = twentyFour[2];
+        if (hours >= 0 && hours <= 23) {
+          const period = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12 || 12;
+          return `${hours}:${minutes} ${period}`;
+        }
+      }
+
+      return str;
     }
 
     async function loadAcceptedBookings() {
@@ -961,14 +990,22 @@
       const bookedTimes = acceptedBookings[dateKey] || [];
 
       timeSelect.innerHTML = '<option value="">Select a time</option>';
+
       times.forEach(t => {
         const opt = document.createElement('option');
-        const isBooked = bookedTimes.includes(normalizeTime(t));
+        const timeKey = normalizeTime(t);
+        const isBooked = bookedTimes.some(bookedTime => {
+          return normalizeTime(bookedTime) === timeKey;
+        });
 
         opt.value = t;
-        opt.textContent = isBooked ? `${t} — Booked` : t;
+        opt.textContent = isBooked ? `${t} - Booked` : t;
         opt.disabled = isBooked;
-        if (isBooked) opt.classList.add('booked-time');
+
+        if (isBooked) {
+          opt.classList.add('booked-time');
+          opt.setAttribute('aria-disabled', 'true');
+        }
 
         timeSelect.appendChild(opt);
       });
